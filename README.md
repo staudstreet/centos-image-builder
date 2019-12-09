@@ -36,13 +36,11 @@ There are two executables: build and cleanup. Open build using a text editor to 
 
 At this point it is advised to use the the "debianvm.seed" or alternatively your own.
 
-
-*
-'''
+```
 #!/bin/sh
 PWROOT=PutWhatYouLikeHereButCrypted.ExampleBelow:
 PWUSER=$6$dtyDwkWfBWfKdpgr$ds/1y5QIwobEupOdQCzcnReXzWOjdr57JZP2IpX09XuYDvC.BjbE9SDR9jigD16u48cGiC3dVi3HCk8arearp1
-'''
+```
 
 # Issues
 
