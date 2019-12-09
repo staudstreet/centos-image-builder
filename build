@@ -1,0 +1,70 @@
+#!/bin/bash -e
+PLATFORM=$(uname)
+INISO=centos-1905.iso
+OUTISO=centos-ks.iso
+KICKSTART=ks.cfg
+PUBKEY=id_rsa.pub
+
+DEV=sda
+KEYMAP=at
+FQDN=VM-$(uuidgen).test.rbrk.at
+#PWROOT= #Already set through a script in /secrets
+USER=api
+#PWUSER= #Already set through a script in /secrets
+
+
+#updates & init
+#if [ "$PLATFORM" = "Darwin" ]; then
+	# os x
+#	brew install xorriso
+#else
+	# debian & ubuntu
+#	sudo apt-get update -y
+	#sudo apt-get upgrade -y
+#	sudo apt-get install -y syslinux-utils libarchive-tools m4 xorriso uuid-runtime
+#fi
+
+#unpack iso
+echo "Unpacking ISO."
+mkdir workdir
+bsdtar -C workdir/ -xf $INISO
+
+#inject assets
+echo "Injecting assets."
+sudo cp "assets/auto_resize_vda.sh" "workdir/"
+sudo cp "secrets/$PUBKEY" "workdir/$PUBKEY"
+sudo cp "assets/isolinux.cfg"  "workdir/isolinux/isolinux.cfg"
+sh secrets/pw.sh
+sudo m4 \
+	-D __FQDN__="$FQDN" \
+	-D __KEYMAP__="$KEYMAP" \
+	-D __PWROOT__="$PWROOT" \
+	-D __USER__="$USER" \
+	-D __PWUSER__="$PWUSER" \
+	-D __DEV__="$DEV" \
+	"assets/$KICKSTART" > "workdir/ks.cfg"
+
+sudo m4 \
+	-D __USER__="$USER" \
+	"assets/sudoers.m4" > "workdir/sudoers"
+
+sudo m4 \
+	-D __USER__="$USER" \
+	-D __PUBLIC_KEY__="$PUBKEY" \
+	"assets/post.sh.m4" > "workdir/post.sh"
+
+#build iso
+echo "Repackaging ISO."
+sudo xorriso -as mkisofs -r -V 'CentOS-8-BaseOS-x86_64' -o $OUTISO -isohybrid-mbr \
+--interval:local_fs:0s-15s:zero_mbrpt,zero_gpt:$INISO \
+-partition_cyl_align off -partition_offset 0 -b isolinux/isolinux.bin -c isolinux/boot.cat \
+-boot-load-size 4 -boot-info-table -no-emul-boot -eltorito-alt-boot \
+-e images/efiboot.img -no-emul-boot -isohybrid-gpt-basdat -boot-load-size 19924 workdir/
+
+#cleanup
+unset PWROOT
+unset PWUSER
+echo "Cleaning up."
+sudo rm -rf workdir
+
+exit 0
